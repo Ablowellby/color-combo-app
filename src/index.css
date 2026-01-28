@@ -1,0 +1,52 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  html {
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  body {
+    @apply bg-cream text-gray-800 antialiased;
+    font-family: 'Inter', system-ui, -apple-system, sans-serif;
+    overscroll-behavior: none;
+  }
+
+  /* Prevent pull-to-refresh on mobile */
+  html, body {
+    overscroll-behavior-y: contain;
+  }
+}
+
+@layer components {
+  .btn-primary {
+    @apply px-4 py-3 bg-gray-800 text-white rounded-xl font-medium
+           active:bg-gray-700 transition-colors touch-manipulation;
+  }
+
+  .btn-secondary {
+    @apply px-4 py-3 bg-warmgray text-gray-800 rounded-xl font-medium
+           active:bg-gray-200 transition-colors touch-manipulation;
+  }
+
+  .card {
+    @apply bg-white rounded-2xl p-4 shadow-sm;
+  }
+
+  .nav-item {
+    @apply flex flex-col items-center justify-center py-2 px-4
+           text-gray-500 transition-colors touch-manipulation;
+  }
+
+  .nav-item.active {
+    @apply text-gray-800;
+  }
+}
+
+/* Safe area insets for iPhone notch */
+@supports (padding-bottom: env(safe-area-inset-bottom)) {
+  .safe-bottom {
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+}
