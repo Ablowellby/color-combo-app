@@ -1,7 +1,22 @@
 import { useState, useRef, useCallback, useEffect } from 'react'
 import { useColorMatch } from '../hooks/useColorMatch'
+import { useCloset } from '../hooks/useCloset'
 import ColorSwatch from '../components/ColorSwatch'
 import CombinationCard from '../components/CombinationCard'
+
+const CATEGORIES = [
+  { id: 'tops', label: 'Tops' },
+  { id: 'bottoms', label: 'Bottoms' },
+  { id: 'dresses', label: 'Dresses' },
+  { id: 'shoes', label: 'Shoes' },
+  { id: 'outerwear', label: 'Outerwear' },
+  { id: 'accessories', label: 'Accessories' },
+  { id: 'bags', label: 'Bags' },
+  { id: 'jewelry', label: 'Jewelry' },
+  { id: 'hats', label: 'Hats' },
+  { id: 'scarves', label: 'Scarves' },
+  { id: 'suits', label: 'Suits' },
+]
 
 function Home() {
   const [capturedImage, setCapturedImage] = useState(null)
@@ -10,12 +25,17 @@ function Home() {
   const [isCapturing, setIsCapturing] = useState(false)
   const [cameraReady, setCameraReady] = useState(false)
   const [cameraError, setCameraError] = useState(null)
+  const [showAddToCloset, setShowAddToCloset] = useState(false)
+  const [itemName, setItemName] = useState('')
+  const [itemCategory, setItemCategory] = useState('tops')
+  const [addedToCloset, setAddedToCloset] = useState(false)
   const videoRef = useRef(null)
   const canvasRef = useRef(null)
   const streamRef = useRef(null)
   const fileInputRef = useRef(null)
 
   const { findClosestColor, getCombinationsForColor } = useColorMatch()
+  const { addItem } = useCloset()
 
   const startCamera = useCallback(async () => {
     setCameraError(null)
@@ -240,7 +260,30 @@ function Home() {
     setMatchedColor(null)
     setCombinations([])
     setCameraError(null)
+    setShowAddToCloset(false)
+    setItemName('')
+    setItemCategory('tops')
+    setAddedToCloset(false)
     stopCamera()
+  }
+
+  const handleAddToCloset = () => {
+    if (!itemName.trim()) {
+      return
+    }
+    if (!matchedColor) {
+      return
+    }
+
+    addItem({
+      name: itemName.trim(),
+      category: itemCategory,
+      colorId: matchedColor.id,
+      imageData: capturedImage,
+    })
+
+    setAddedToCloset(true)
+    setShowAddToCloset(false)
   }
 
   return (
@@ -411,8 +454,88 @@ function Home() {
             </div>
           </div>
 
+          {/* Add to Closet Section */}
+          {!addedToCloset && !showAddToCloset && (
+            <button
+              onClick={() => setShowAddToCloset(true)}
+              className="btn-primary w-full"
+            >
+              + Add to Closet
+            </button>
+          )}
+
+          {showAddToCloset && (
+            <div className="card space-y-3">
+              <h3 className="font-semibold text-slate-800">Add to Closet</h3>
+
+              <div>
+                <label className="block text-sm text-gray-600 mb-1">
+                  Item name
+                </label>
+                <input
+                  type="text"
+                  value={itemName}
+                  onChange={(e) => setItemName(e.target.value)}
+                  placeholder="e.g., Blue wool sweater"
+                  className="w-full px-4 py-3 bg-warmgray rounded-xl border-0
+                             focus:outline-none focus:ring-2 focus:ring-gray-300"
+                  autoFocus
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm text-gray-600 mb-1">
+                  Category
+                </label>
+                <div className="flex flex-wrap gap-2">
+                  {CATEGORIES.map(cat => (
+                    <button
+                      key={cat.id}
+                      onClick={() => setItemCategory(cat.id)}
+                      className={`px-3 py-1.5 rounded-full text-sm font-medium
+                                 transition-colors touch-manipulation ${
+                        itemCategory === cat.id
+                          ? 'bg-gray-800 text-white'
+                          : 'bg-warmgray text-gray-600'
+                      }`}
+                    >
+                      {cat.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div className="flex gap-2 pt-2">
+                <button
+                  onClick={handleAddToCloset}
+                  disabled={!itemName.trim()}
+                  className="btn-primary flex-1 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  Save to Closet
+                </button>
+                <button
+                  onClick={() => setShowAddToCloset(false)}
+                  className="btn-secondary"
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+          )}
+
+          {addedToCloset && (
+            <div className="card bg-green-50 border border-green-200">
+              <div className="flex items-center gap-2 text-green-700">
+                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                </svg>
+                <span className="font-medium">Added to your closet!</span>
+              </div>
+            </div>
+          )}
+
           <button onClick={reset} className="btn-secondary w-full">
-            Try Another
+            {addedToCloset ? 'Capture Another' : 'Try Another'}
           </button>
 
           {combinations.length > 0 && (
