@@ -21,7 +21,8 @@ function AddItemModal({ onClose, onSave, editItem = null }) {
   const [name, setName] = useState(editItem?.name || '')
   const [category, setCategory] = useState(editItem?.category || 'tops')
   const [colorId, setColorId] = useState(editItem?.colorId || '')
-  const [imageData, setImageData] = useState(editItem?.imageData || '')
+  const [images, setImages] = useState(editItem?.images || (editItem?.imageData ? [editItem.imageData] : []))
+  const [thumbnailIndex, setThumbnailIndex] = useState(editItem?.thumbnailIndex || 0)
   const [showColorPicker, setShowColorPicker] = useState(false)
   const [colorSearch, setColorSearch] = useState('')
 
@@ -34,58 +35,72 @@ function AddItemModal({ onClose, onSave, editItem = null }) {
     : colors
 
   const handleImageUpload = (e) => {
-    const file = e.target.files?.[0]
-    if (!file) return
+    const files = Array.from(e.target.files || [])
+    if (files.length === 0) return
 
-    const reader = new FileReader()
-    reader.onload = (event) => {
-      const img = new Image()
-      img.onload = () => {
-        // Resize image if too large
-        const maxSize = 800
-        let width = img.width
-        let height = img.height
+    files.forEach(file => {
+      const reader = new FileReader()
+      reader.onload = (event) => {
+        const img = new Image()
+        img.onload = () => {
+          // Resize image if too large
+          const maxSize = 800
+          let width = img.width
+          let height = img.height
 
-        if (width > maxSize || height > maxSize) {
-          if (width > height) {
-            height = (height / width) * maxSize
-            width = maxSize
-          } else {
-            width = (width / height) * maxSize
-            height = maxSize
+          if (width > maxSize || height > maxSize) {
+            if (width > height) {
+              height = (height / width) * maxSize
+              width = maxSize
+            } else {
+              width = (width / height) * maxSize
+              height = maxSize
+            }
+          }
+
+          const canvas = canvasRef.current
+          canvas.width = width
+          canvas.height = height
+          const ctx = canvas.getContext('2d')
+          ctx.drawImage(img, 0, 0, width, height)
+
+          const resizedData = canvas.toDataURL('image/jpeg', 0.7)
+          setImages(prev => [...prev, resizedData])
+
+          // Auto-detect color from center if no color selected yet
+          if (!colorId) {
+            const centerX = Math.floor(width / 2)
+            const centerY = Math.floor(height / 2)
+            const sampleSize = Math.min(50, width / 4, height / 4)
+
+            const pixelData = ctx.getImageData(
+              centerX - sampleSize / 2,
+              centerY - sampleSize / 2,
+              sampleSize,
+              sampleSize
+            )
+
+            const avgColor = getAverageColor(pixelData.data)
+            const closest = findClosestColor(avgColor)
+            if (closest) {
+              setColorId(closest.id)
+            }
           }
         }
-
-        const canvas = canvasRef.current
-        canvas.width = width
-        canvas.height = height
-        const ctx = canvas.getContext('2d')
-        ctx.drawImage(img, 0, 0, width, height)
-
-        const resizedData = canvas.toDataURL('image/jpeg', 0.7)
-        setImageData(resizedData)
-
-        // Auto-detect color from center
-        const centerX = Math.floor(width / 2)
-        const centerY = Math.floor(height / 2)
-        const sampleSize = Math.min(50, width / 4, height / 4)
-
-        const pixelData = ctx.getImageData(
-          centerX - sampleSize / 2,
-          centerY - sampleSize / 2,
-          sampleSize,
-          sampleSize
-        )
-
-        const avgColor = getAverageColor(pixelData.data)
-        const closest = findClosestColor(avgColor)
-        if (closest && !colorId) {
-          setColorId(closest.id)
-        }
+        img.src = event.target.result
       }
-      img.src = event.target.result
+      reader.readAsDataURL(file)
+    })
+
+    // Reset file input
+    e.target.value = ''
+  }
+
+  const removeImage = (index) => {
+    setImages(prev => prev.filter((_, i) => i !== index))
+    if (thumbnailIndex >= index && thumbnailIndex > 0) {
+      setThumbnailIndex(thumbnailIndex - 1)
     }
-    reader.readAsDataURL(file)
   }
 
   const getAverageColor = (data) => {
@@ -119,7 +134,10 @@ function AddItemModal({ onClose, onSave, editItem = null }) {
       name: name.trim(),
       category,
       colorId,
-      imageData,
+      images,
+      thumbnailIndex,
+      // Keep imageData for backwards compatibility
+      imageData: images[thumbnailIndex] || images[0] || '',
     })
   }
 
@@ -147,31 +165,73 @@ function AddItemModal({ onClose, onSave, editItem = null }) {
           ref={fileInputRef}
           type="file"
           accept="image/*"
+          multiple
           onChange={handleImageUpload}
           className="hidden"
         />
 
         <div className="p-4 space-y-4">
-          {/* Image */}
+          {/* Images */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">
-              Photo (optional)
+              Photos {images.length > 0 && `(${images.length})`}
             </label>
-            {imageData ? (
-              <div className="relative">
-                <img
-                  src={imageData}
-                  alt="Item"
-                  className="w-full aspect-square object-cover rounded-xl"
-                />
-                <button
-                  onClick={() => setImageData('')}
-                  className="absolute top-2 right-2 p-2 bg-black/50 rounded-full text-white"
-                >
-                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                  </svg>
-                </button>
+
+            {images.length > 0 ? (
+              <div className="space-y-3">
+                {/* Main thumbnail */}
+                <div className="relative">
+                  <img
+                    src={images[thumbnailIndex] || images[0]}
+                    alt="Item thumbnail"
+                    className="w-full aspect-square object-cover rounded-xl"
+                  />
+                  <div className="absolute top-2 left-2 px-2 py-1 bg-black/50 rounded-full text-white text-xs">
+                    Thumbnail
+                  </div>
+                </div>
+
+                {/* Image gallery */}
+                <div className="flex gap-2 overflow-x-auto pb-2">
+                  {images.map((img, idx) => (
+                    <div key={idx} className="relative flex-shrink-0">
+                      <button
+                        onClick={() => setThumbnailIndex(idx)}
+                        className={`w-16 h-16 rounded-lg overflow-hidden border-2 ${
+                          thumbnailIndex === idx
+                            ? 'border-gray-800'
+                            : 'border-transparent'
+                        }`}
+                      >
+                        <img
+                          src={img}
+                          alt={`Photo ${idx + 1}`}
+                          className="w-full h-full object-cover"
+                        />
+                      </button>
+                      <button
+                        onClick={() => removeImage(idx)}
+                        className="absolute -top-1 -right-1 w-5 h-5 bg-red-500 rounded-full text-white flex items-center justify-center text-xs"
+                      >
+                        ×
+                      </button>
+                    </div>
+                  ))}
+
+                  {/* Add more button */}
+                  <button
+                    onClick={() => fileInputRef.current?.click()}
+                    className="w-16 h-16 flex-shrink-0 bg-warmgray rounded-lg flex items-center justify-center text-gray-400 border-2 border-dashed border-gray-300"
+                  >
+                    <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                    </svg>
+                  </button>
+                </div>
+
+                <p className="text-xs text-gray-500">
+                  Tap a photo to set it as the thumbnail
+                </p>
               </div>
             ) : (
               <button
@@ -181,7 +241,7 @@ function AddItemModal({ onClose, onSave, editItem = null }) {
                 <svg className="w-8 h-8 mb-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
                 </svg>
-                <span className="text-sm">Add photo</span>
+                <span className="text-sm">Add photos</span>
               </button>
             )}
           </div>

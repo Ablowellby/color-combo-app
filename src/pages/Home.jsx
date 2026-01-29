@@ -279,7 +279,9 @@ function Home() {
       name: itemName.trim(),
       category: itemCategory,
       colorId: matchedColor.id,
-      imageData: capturedImage,
+      images: capturedImage ? [capturedImage] : [],
+      thumbnailIndex: 0,
+      imageData: capturedImage, // Keep for backwards compatibility
     })
 
     setAddedToCloset(true)
@@ -300,43 +302,7 @@ function Home() {
 
       {!isCapturing && !capturedImage && (
         <div className="space-y-6">
-          {/* Hero Section */}
-          <div className="card bg-gradient-to-br from-amber-50 to-rose-50 border border-amber-100">
-            {/* Book visualization */}
-            <div className="flex justify-center mb-4">
-              <div className="relative">
-                <div className="w-32 h-44 bg-gradient-to-br from-slate-800 to-slate-900 rounded-sm shadow-lg transform -rotate-3">
-                  <div className="absolute inset-2 border border-amber-400/30 rounded-sm flex flex-col items-center justify-center p-2">
-                    <div className="flex gap-1 mb-2">
-                      <div className="w-4 h-4 rounded-full bg-red-500"></div>
-                      <div className="w-4 h-4 rounded-full bg-blue-500"></div>
-                      <div className="w-4 h-4 rounded-full bg-yellow-500"></div>
-                    </div>
-                    <div className="text-amber-400/80 text-[6px] text-center font-serif leading-tight">
-                      A DICTIONARY<br/>OF COLOR<br/>COMBINATIONS
-                    </div>
-                    <div className="text-amber-400/60 text-[5px] mt-1">SANZO WADA</div>
-                  </div>
-                </div>
-                <div className="w-32 h-44 bg-gradient-to-br from-slate-700 to-slate-800 rounded-sm shadow-lg absolute top-1 left-1 -z-10 transform rotate-3"></div>
-              </div>
-            </div>
-
-            <h2 className="text-lg font-bold text-slate-800 text-center mb-2">
-              A Dictionary of Color Combinations
-            </h2>
-            <p className="text-sm text-slate-600 text-center mb-3">
-              by Sanzo Wada (1883-1967)
-            </p>
-            <p className="text-sm text-slate-600 leading-relaxed">
-              Sanzo Wada was a pioneering Japanese artist, teacher, and designer who dedicated his career to studying color and its applications. In the 1930s, he published this remarkable guide containing 348 color combinations, originally created to help kimono designers, artists, and craftspeople select harmonious palettes.
-            </p>
-            <p className="text-sm text-slate-600 leading-relaxed mt-2">
-              Nearly a century later, his timeless combinations remain a treasured resource for designers worldwide. This app brings Wada's work into your wardrobe, helping you discover unexpected and beautiful color pairings for your everyday outfits.
-            </p>
-          </div>
-
-          {/* Color Match Section */}
+          {/* Color Match Section - Primary Action */}
           <div className="card">
             <h2 className="text-lg font-semibold mb-2">Match a Color</h2>
             <p className="text-gray-600 text-sm mb-4">
@@ -372,6 +338,42 @@ function Home() {
               <p className="text-2xl font-bold text-slate-800">348</p>
               <p className="text-xs text-gray-500">Combinations</p>
             </div>
+          </div>
+
+          {/* About Section */}
+          <div className="card bg-gradient-to-br from-amber-50 to-rose-50 border border-amber-100">
+            {/* Book visualization */}
+            <div className="flex justify-center mb-4">
+              <div className="relative">
+                <div className="w-32 h-44 bg-gradient-to-br from-slate-800 to-slate-900 rounded-sm shadow-lg transform -rotate-3">
+                  <div className="absolute inset-2 border border-amber-400/30 rounded-sm flex flex-col items-center justify-center p-2">
+                    <div className="flex gap-1 mb-2">
+                      <div className="w-4 h-4 rounded-full bg-red-500"></div>
+                      <div className="w-4 h-4 rounded-full bg-blue-500"></div>
+                      <div className="w-4 h-4 rounded-full bg-yellow-500"></div>
+                    </div>
+                    <div className="text-amber-400/80 text-[6px] text-center font-serif leading-tight">
+                      A DICTIONARY<br/>OF COLOR<br/>COMBINATIONS
+                    </div>
+                    <div className="text-amber-400/60 text-[5px] mt-1">SANZO WADA</div>
+                  </div>
+                </div>
+                <div className="w-32 h-44 bg-gradient-to-br from-slate-700 to-slate-800 rounded-sm shadow-lg absolute top-1 left-1 -z-10 transform rotate-3"></div>
+              </div>
+            </div>
+
+            <h2 className="text-lg font-bold text-slate-800 text-center mb-2">
+              A Dictionary of Color Combinations
+            </h2>
+            <p className="text-sm text-slate-600 text-center mb-3">
+              by Sanzo Wada (1883-1967)
+            </p>
+            <p className="text-sm text-slate-600 leading-relaxed">
+              Sanzo Wada was a pioneering Japanese artist, teacher, and designer who dedicated his career to studying color and its applications. In the 1930s, he published this remarkable guide containing 348 color combinations, originally created to help kimono designers, artists, and craftspeople select harmonious palettes.
+            </p>
+            <p className="text-sm text-slate-600 leading-relaxed mt-2">
+              Nearly a century later, his timeless combinations remain a treasured resource for designers worldwide. This app brings Wada's work into your wardrobe, helping you discover unexpected and beautiful color pairings for your everyday outfits.
+            </p>
           </div>
         </div>
       )}
