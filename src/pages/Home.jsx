@@ -1,6 +1,7 @@
 import { useState, useRef, useCallback, useEffect } from 'react'
 import { useColorMatch } from '../hooks/useColorMatch'
 import { useCloset } from '../hooks/useCloset'
+import { colors } from '../data/colors'
 import ColorSwatch from '../components/ColorSwatch'
 import CombinationCard from '../components/CombinationCard'
 
@@ -29,12 +30,18 @@ function Home() {
   const [itemName, setItemName] = useState('')
   const [itemCategory, setItemCategory] = useState('tops')
   const [addedToCloset, setAddedToCloset] = useState(false)
+  const [flashEnabled, setFlashEnabled] = useState(false)
+  const [flashSupported, setFlashSupported] = useState(false)
+  const [similarColors, setSimilarColors] = useState([])
+  const [showColorPicker, setShowColorPicker] = useState(false)
+  const [colorSearch, setColorSearch] = useState('')
+  const [capturedRgb, setCapturedRgb] = useState(null)
   const videoRef = useRef(null)
   const canvasRef = useRef(null)
   const streamRef = useRef(null)
   const fileInputRef = useRef(null)
 
-  const { findClosestColor, getCombinationsForColor } = useColorMatch()
+  const { findClosestColor, getCombinationsForColor, getSimilarColors } = useColorMatch()
   const { addItem } = useCloset()
 
   const startCamera = useCallback(async () => {
@@ -63,6 +70,20 @@ function Home() {
       }
 
       streamRef.current = stream
+
+      // Check if torch/flash is supported
+      const videoTrack = stream.getVideoTracks()[0]
+      if (videoTrack) {
+        try {
+          const capabilities = videoTrack.getCapabilities()
+          if (capabilities.torch) {
+            setFlashSupported(true)
+          }
+        } catch (e) {
+          // getCapabilities not supported
+          setFlashSupported(false)
+        }
+      }
 
       if (videoRef.current) {
         videoRef.current.srcObject = stream
@@ -102,7 +123,26 @@ function Home() {
     }
     setIsCapturing(false)
     setCameraReady(false)
+    setFlashEnabled(false)
+    setFlashSupported(false)
   }, [])
+
+  const toggleFlash = useCallback(async () => {
+    if (!streamRef.current || !flashSupported) return
+
+    const videoTrack = streamRef.current.getVideoTracks()[0]
+    if (!videoTrack) return
+
+    try {
+      const newFlashState = !flashEnabled
+      await videoTrack.applyConstraints({
+        advanced: [{ torch: newFlashState }]
+      })
+      setFlashEnabled(newFlashState)
+    } catch (e) {
+      console.error('Failed to toggle flash:', e)
+    }
+  }, [flashEnabled, flashSupported])
 
   // Cleanup on unmount
   useEffect(() => {
@@ -113,11 +153,27 @@ function Home() {
     }
   }, [])
 
-  const capturePhoto = useCallback(() => {
+  const capturePhoto = useCallback(async () => {
     if (!videoRef.current || !canvasRef.current || !cameraReady) return
 
     const video = videoRef.current
     const canvas = canvasRef.current
+
+    // If flash is enabled and supported, ensure it's on and wait for stabilization
+    if (flashEnabled && flashSupported && streamRef.current) {
+      const videoTrack = streamRef.current.getVideoTracks()[0]
+      if (videoTrack) {
+        try {
+          await videoTrack.applyConstraints({
+            advanced: [{ torch: true }]
+          })
+          // Wait a moment for the flash to illuminate the scene
+          await new Promise(resolve => setTimeout(resolve, 200))
+        } catch (e) {
+          console.error('Failed to enable flash for capture:', e)
+        }
+      }
+    }
 
     // Calculate the sample region that corresponds to the white square overlay
     // The white square is 48x48 CSS pixels (w-12 h-12), centered in the video
@@ -176,15 +232,19 @@ function Home() {
     const closest = findClosestColor(avgColor)
 
     setCapturedImage(swatchImage)
+    setCapturedRgb(avgColor)
 
     if (closest) {
       setMatchedColor(closest)
       const combos = getCombinationsForColor(closest.id)
       setCombinations(combos)
+      // Get similar colors for override suggestions
+      const similar = getSimilarColors(avgColor, 4, closest.id)
+      setSimilarColors(similar)
     }
 
     stopCamera()
-  }, [stopCamera, cameraReady, findClosestColor, getCombinationsForColor])
+  }, [stopCamera, cameraReady, findClosestColor, getCombinationsForColor, getSimilarColors, flashEnabled, flashSupported])
 
   const handleFileUpload = (e) => {
     const file = e.target.files?.[0]
@@ -226,11 +286,15 @@ function Home() {
         const closest = findClosestColor(avgColor)
 
         setCapturedImage(swatchImage)
+        setCapturedRgb(avgColor)
 
         if (closest) {
           setMatchedColor(closest)
           const combos = getCombinationsForColor(closest.id)
           setCombinations(combos)
+          // Get similar colors for override suggestions
+          const similar = getSimilarColors(avgColor, 4, closest.id)
+          setSimilarColors(similar)
         }
       }
       img.src = event.target.result
@@ -264,8 +328,29 @@ function Home() {
     setItemName('')
     setItemCategory('tops')
     setAddedToCloset(false)
+    setSimilarColors([])
+    setShowColorPicker(false)
+    setColorSearch('')
+    setCapturedRgb(null)
     stopCamera()
   }
+
+  const selectColor = (color) => {
+    setMatchedColor(color)
+    const combos = getCombinationsForColor(color.id)
+    setCombinations(combos)
+    setShowColorPicker(false)
+    setColorSearch('')
+    // Update similar colors based on selected color
+    if (capturedRgb) {
+      const similar = getSimilarColors(capturedRgb, 4, color.id)
+      setSimilarColors(similar)
+    }
+  }
+
+  const filteredColors = colorSearch
+    ? colors.filter(c => c.name.toLowerCase().includes(colorSearch.toLowerCase()))
+    : colors
 
   const handleAddToCloset = () => {
     if (!itemName.trim()) {
@@ -393,6 +478,23 @@ function Home() {
                 <div className="text-white text-sm">Starting camera...</div>
               </div>
             )}
+
+            {/* Flash toggle button */}
+            {flashSupported && cameraReady && (
+              <button
+                onClick={toggleFlash}
+                className={`absolute top-3 right-3 p-2 rounded-full transition-colors ${
+                  flashEnabled
+                    ? 'bg-yellow-400 text-yellow-900'
+                    : 'bg-black/50 text-white'
+                }`}
+              >
+                <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+                </svg>
+              </button>
+            )}
+
             <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
               <div className="w-12 h-12 border-2 border-white rounded-md shadow-lg">
                 <div className="w-full h-full border border-white/30 rounded-sm" />
@@ -454,6 +556,76 @@ function Home() {
                 </div>
               )}
             </div>
+
+            {/* Similar colors / Override section */}
+            {similarColors.length > 0 && !showColorPicker && (
+              <div className="border-t border-gray-100 pt-3">
+                <p className="text-xs text-gray-500 mb-2">Not quite right? Try these similar colors:</p>
+                <div className="flex flex-wrap gap-2 items-center">
+                  {similarColors.map(color => (
+                    <button
+                      key={color.id}
+                      onClick={() => selectColor(color)}
+                      className="flex items-center gap-2 px-2 py-1 bg-warmgray rounded-lg hover:bg-gray-200 transition-colors"
+                      title={color.name}
+                    >
+                      <div
+                        className="w-6 h-6 rounded-md shadow-sm flex-shrink-0"
+                        style={{ backgroundColor: color.hex }}
+                      />
+                      <span className="text-xs text-gray-700 max-w-20 truncate">{color.name}</span>
+                    </button>
+                  ))}
+                  <button
+                    onClick={() => setShowColorPicker(true)}
+                    className="px-3 py-1.5 text-xs text-gray-600 bg-warmgray rounded-lg hover:bg-gray-200 transition-colors"
+                  >
+                    More...
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* Full color picker dropdown */}
+            {showColorPicker && (
+              <div className="border-t border-gray-100 pt-3">
+                <div className="flex items-center justify-between mb-2">
+                  <p className="text-sm font-medium text-gray-700">Choose a color</p>
+                  <button
+                    onClick={() => {
+                      setShowColorPicker(false)
+                      setColorSearch('')
+                    }}
+                    className="text-xs text-gray-500 hover:text-gray-700"
+                  >
+                    Cancel
+                  </button>
+                </div>
+                <input
+                  type="text"
+                  value={colorSearch}
+                  onChange={(e) => setColorSearch(e.target.value)}
+                  placeholder="Search colors..."
+                  className="w-full px-3 py-2 bg-warmgray rounded-lg text-sm mb-2
+                             focus:outline-none focus:ring-2 focus:ring-gray-300"
+                  autoFocus
+                />
+                <div className="grid grid-cols-6 gap-1 max-h-48 overflow-y-auto">
+                  {filteredColors.map(color => (
+                    <button
+                      key={color.id}
+                      onClick={() => selectColor(color)}
+                      className={`aspect-square rounded-lg transition-transform
+                                 active:scale-90 ${
+                        matchedColor?.id === color.id ? 'ring-2 ring-gray-800 ring-offset-1' : ''
+                      }`}
+                      style={{ backgroundColor: color.hex }}
+                      title={color.name}
+                    />
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
 
           {/* Add to Closet Section */}

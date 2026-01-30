@@ -104,9 +104,27 @@ export function useColorMatch() {
     return scored.map(({ combo }) => combo)
   }, [])
 
+  // Find similar colors to a given RGB value (for override suggestions)
+  const getSimilarColors = useCallback((rgb, count = 5, excludeId = null) => {
+    const inputLab = rgbToLab(rgb)
+
+    const scored = colors
+      .filter(c => c.id !== excludeId)
+      .map(color => {
+        const colorLab = color.lab || rgbToLab(color.rgb)
+        const distance = deltaE(inputLab, colorLab)
+        return { color, distance }
+      })
+      .sort((a, b) => a.distance - b.distance)
+      .slice(0, count)
+
+    return scored.map(({ color }) => color)
+  }, [])
+
   return {
     findClosestColor,
     getCombinationsForColor,
     getCombinationsForColors,
+    getSimilarColors,
   }
 }
